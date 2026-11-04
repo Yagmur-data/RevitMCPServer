@@ -77,6 +77,7 @@ const PROFILES: Record<string, string[]> = {
     "revit_create_wall", "revit_create_floor", "revit_create_level",
     "revit_create_grid", "revit_create_room", "revit_create_column",
     "revit_create_beam", "revit_create_ceiling", "revit_create_opening_in_wall",
+    "revit_create_stair", "revit_create_roof", "revit_create_railing",
     "revit_place_family_instance",
   ],
   documentation: [
@@ -95,10 +96,11 @@ const PROFILES: Record<string, string[]> = {
     "revit_copy_parameters", "revit_set_level_elevation", "revit_move_element",
     "revit_rotate_element", "revit_copy_element", "revit_mirror_element",
     "revit_array_linear", "revit_delete_elements", "revit_group_elements",
-    "revit_ungroup_elements", "revit_load_family", "revit_duplicate_family_type",
+    "revit_ungroup_elements", "revit_load_family", "revit_duplicate_family_type", "revit_set_wall_type_layers",
   ],
   view: [
-    "revit_open_view", "revit_set_view_detail_level",
+    "revit_open_view", "revit_set_view_detail_level", "revit_set_view_display_style",
+    "revit_set_category_visibility", "revit_set_grid_vertical_extents",
     "revit_hide_elements_in_view", "revit_unhide_elements_in_view",
     "revit_isolate_elements_in_view", "revit_set_section_box",
     "revit_select_elements", "revit_zoom_to_elements", "revit_apply_view_filter",
@@ -373,6 +375,42 @@ server.tool("revit_create_opening_in_wall", "Create a rectangular opening in a w
   dryRun: dryRunField,
 }, fwdWrite("create_opening_in_wall"));
 
+server.tool("revit_create_stair", "Create a Stairs element with real treads/risers between two levels (Autodesk.Revit.DB.Architecture.Stairs via StairsEditScope) — NOT a floor opening and NOT a ramp. One straight run from start/end, or several straight runs in ONE Stairs element via `runs`, joined by real stairs landings (automatic, or sketched from landingProfiles) — no separate Floor or intermediate level needed. Riser height comes from the level height and the stairs type; each run's riser count from its walking-line length (rounded to a multiple of the tread depth).", {
+  start: xyz.optional().describe("Walking-line start, at the base level (single run)."),
+  end: xyz.optional().describe("Walking-line end, at the base level (single run)."),
+  runs: z.array(z.object({ start: xyz, end: xyz })).min(1).optional().describe("Several straight runs (replaces start/end). Run 1 starts at the base level, each next run at the top of the previous one; size each walking line as (risers − 1) × tread."),
+  landingProfiles: z.array(z.array(xyz).min(3).nullable()).optional().describe("Optional closed outline per gap between runs (index i = landing after run i+1); null/missing = automatic landing."),
+  treadDepth: z.number().positive().optional().describe("Stairs Actual Tread Depth, set before the runs are built."),
+  runWidth: z.number().positive().optional().describe("Actual Run Width for every run (the automatic landing takes it too)."),
+  desiredRisers: z.number().int().positive().optional().describe("Stairs Desired Number of Risers."),
+  baseLevelName: z.string().optional().describe("Defaults to the lowest level."),
+  topLevelName: z.string().optional().describe("Defaults to the next level above the base level."),
+  stairsTypeName: z.string().optional(),
+  units: unitsField,
+  dryRun: dryRunField,
+}, fwdWrite("create_stair"));
+
+server.tool("revit_create_roof", "Create a FootPrintRoof (flat, hip, gable, shed or mixed per-edge slopes) from a closed polygonal profile — a real RoofBase element (Autodesk.Revit.DB.FootPrintRoof), not a floor slab standing in for a roof.", {
+  profile: z.array(xyz).min(3).describe("Closed polygon, at least 3 points. Closed automatically."),
+  levelName: z.string().optional().describe("Defaults to the highest level."),
+  roofTypeName: z.string().optional().describe("List types with revit_list_elements category OST_Roofs. Avoid 'Sloped Glazing' unless a glazed roof is wanted."),
+  slopeAngleDeg: z.number().optional().describe("Applied to every edge uniformly. Default 0 (flat)."),
+  edgeSlopesDeg: z.array(z.number().nullable()).optional().describe(
+    "One entry per edge; edge i runs profile[i] -> profile[i+1], the last edge closes to profile[0]. " +
+    "null/0 = edge does not define slope (gable end). Overrides slopeAngleDeg. " +
+    "Gable on a rectangle: [30, null, 30, null]; shed: [10, null, null, null]."),
+  units: unitsField,
+  dryRun: dryRunField,
+}, fwdWrite("create_roof"));
+
+server.tool("revit_create_railing", "Create a free-standing Railing element (Autodesk.Revit.DB.Architecture.Railing) along a path — not hosted on a stair or floor edge. Useful for balconies, terraces, or a guard rail beside an opening.", {
+  path: z.array(xyz).min(2).describe("Open polyline, at least 2 points."),
+  levelName: z.string().optional().describe("Defaults to the lowest level."),
+  railingTypeName: z.string().optional(),
+  units: unitsField,
+  dryRun: dryRunField,
+}, fwdWrite("create_railing"));
+
 server.tool("revit_place_family_instance", "Place a FamilyInstance at a point. Pass hostId (wall element id) for doors/windows so Revit uses the hosted overload and auto-cuts the opening. Without hostId the instance is placed non-hosted (no opening cut). When selection is ambiguous returns a candidate list with placed:false.", {
   location: xyz,
   familyName: z.string().optional(),
@@ -546,10 +584,22 @@ server.tool("revit_load_family",
 }, fwdWrite("load_family"));
 
 server.tool("revit_duplicate_family_type",
-  "Duplicate a family type (FamilySymbol) under a new name. Set parameters on the new type afterwards with revit_set_parameter using the returned typeId.", {
-  sourceTypeId: z.number().int().describe("ElementId of the FamilySymbol to copy."),
+  "Duplicate a type under a new name: a loadable family type (FamilySymbol) or a system family type (railing, stair, wall, floor, roof types). Set parameters on the new type afterwards with revit_set_parameter using the returned typeId.", {
+  sourceTypeId: z.number().int().describe("ElementId of the type (FamilySymbol or other ElementType) to copy."),
   newName: z.string().describe("Name for the new type (unique within the family)."),
 }, fwdWrite("duplicate_family_type"));
+
+server.tool("revit_set_wall_type_layers",
+  "Replace the layer build-up of a Basic wall type (exterior → interior), e.g. a single 24 mm 'Glass' layer for a slanted glazing wall (curtain walls cannot be slanted). Every wall of the type changes — duplicate the type first with revit_duplicate_family_type.", {
+  typeId: z.number().int().describe("ElementId of a Basic WallType."),
+  layers: z.array(z.object({
+    materialName: z.string().describe("Exact material name (revit_list_materials)."),
+    width: z.number().nonnegative().describe("Layer width (0 for a Membrane layer)."),
+    function: z.enum(["Structure", "Substrate", "Insulation", "Finish1", "Finish2", "Membrane"]).optional().describe("Default Structure."),
+  })).min(1),
+  units: unitsField,
+  dryRun: dryRunField,
+}, fwdWrite("set_wall_type_layers"));
 
 server.tool("revit_create_detail_line",
   "Create a view-specific detail line in a 2D view (plan/section/elevation/drafting/detail). Endpoints are projected onto the view plane.", {
@@ -712,6 +762,27 @@ server.tool("revit_set_view_detail_level", "Set detail level: Coarse, Medium, or
   detailLevel: z.enum(["Coarse", "Medium", "Fine"]),
   dryRun: dryRunField,
 }, fwdWrite("set_view_detail_level"));
+
+server.tool("revit_set_view_display_style", "Set the view's visual style (Wireframe/HLR/Shading/ShadingWithEdges/Realistic/RayTrace) — the same control as the Graphic Display Options at the bottom of the canvas. Realistic renders real material appearances instantly and is what makes get_view_image exports look photoreal-ish rather than a line drawing. RayTrace is Revit's true path-traced renderer but converges progressively in the live viewport, so a headless export right after switching may still look noisy.", {
+  viewId: z.number().int().optional(),
+  style: z.enum(["Wireframe", "HLR", "Shading", "ShadingWithEdges", "Realistic", "RayTrace"]),
+  dryRun: dryRunField,
+}, fwdWrite("set_view_display_style"));
+
+server.tool("revit_set_category_visibility", "Show or hide a whole category in one view — the Visibility/Graphics check box (e.g. turn on 'Room Tags' in a plan where placed tags are invisible). Refused for views controlled by a view template.", {
+  viewId: z.number().int().optional(),
+  category: z.string().describe("Category display name, e.g. 'Room Tags', 'Rooms'."),
+  visible: z.boolean(),
+  dryRun: dryRunField,
+}, fwdWrite("set_category_visibility"));
+
+server.tool("revit_set_grid_vertical_extents", "Set how far grids run up/down in elevations and sections (Grid.SetVerticalExtents) — moves the grid bubbles, e.g. above the roof when they sit on the upper windows. Applies to every elevation/section at once. Omit ids for all grids.", {
+  ids: z.array(z.number().int()).optional(),
+  bottom: z.number().describe("Lower end, absolute elevation."),
+  top: z.number().describe("Upper end, absolute elevation."),
+  units: unitsField,
+  dryRun: dryRunField,
+}, fwdWrite("set_grid_vertical_extents"));
 
 server.tool("revit_hide_elements_in_view", "Hide elements in a view.", {
   ids: idsField,

@@ -176,6 +176,21 @@ public static class P
     public static bool BoolOr(JsonObject obj, string key, bool @default) =>
         obj[key] is { } n ? AsBool(n, key) : @default;
 
+    /// <summary>
+    /// Reads an optional array of numbers where individual entries may be
+    /// null (e.g. per-edge values with "not set" holes). Returns null when the
+    /// key is absent.
+    /// </summary>
+    public static IList<double?>? NullableDblListOrNull(JsonObject obj, string key)
+    {
+        if (obj[key] is null) return null;
+        if (obj[key] is not JsonArray arr) throw Invalid(key, "an array of numbers or nulls", obj[key]);
+        var list = new List<double?>(arr.Count);
+        for (var i = 0; i < arr.Count; i++)
+            list.Add(arr[i] is { } n ? AsDouble(n, $"{key}[{i}]") : null);
+        return list;
+    }
+
     public static JsonObject Obj(JsonObject obj, string key)
     {
         var node = obj[key] as JsonObject
@@ -235,4 +250,29 @@ public static class P
 
     public static string Units(JsonObject parameters) =>
         StrOrNull(parameters, "units")?.ToLowerInvariant() ?? "meters";
+}
+
+/// <summary>
+/// Name-based parameter lookup for write paths.  Element.LookupParameter returns
+/// the FIRST parameter with a matching name, and some system types carry several:
+/// a RailingType has three "Height" parameters, and the two read-only handrail
+/// ones come before the writable top-rail one, so a plain lookup made the top
+/// rail height impossible to set.  When the first match is read-only, prefer a
+/// writable parameter with the same name; otherwise behave exactly like
+/// LookupParameter.
+/// </summary>
+public static class ParamLookup
+{
+    public static Parameter? Writable(Element element, string name)
+    {
+        var first = element.LookupParameter(name);
+        if (first is null || !first.IsReadOnly) return first;
+
+        foreach (Parameter candidate in element.Parameters)
+        {
+            if (!candidate.IsReadOnly && candidate.Definition?.Name == name)
+                return candidate;
+        }
+        return first;
+    }
 }

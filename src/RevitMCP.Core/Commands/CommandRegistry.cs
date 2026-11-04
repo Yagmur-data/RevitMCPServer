@@ -72,6 +72,10 @@ public sealed class CommandRegistry
         Register(new CreateBeamCommand());
         Register(new CreateCeilingCommand());
         Register(new CreateOpeningInWallCommand());
+        Register(new CreateStairCommand());
+        Register(new CreateRoofCommand());
+        Register(new CreateRailingCommand());
+        Register(new DebugRoofApiCommand());
         Register(new PlaceFamilyInstanceCommand());
 
         // === Creation — documentation ===
@@ -125,6 +129,10 @@ public sealed class CommandRegistry
         // === View manipulation ===
         Register(new OpenViewCommand());
         Register(new SetViewDetailLevelCommand());
+        Register(new SetViewDisplayStyleCommand());
+        Register(new SetCategoryVisibilityCommand());
+        Register(new SetGridVerticalExtentsCommand());
+        Register(new SetWallTypeLayersCommand());
         Register(new HideElementsInViewCommand());
         Register(new UnhideElementsInViewCommand());
         Register(new IsolateElementsInViewCommand());

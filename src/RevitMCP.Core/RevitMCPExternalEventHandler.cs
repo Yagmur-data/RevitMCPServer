@@ -151,6 +151,27 @@ public sealed class RevitMCPExternalEventHandler : IExternalEventHandler
             }
         }
 
+        // Self-managed-transaction commands open/commit (or roll back) their
+        // own Transaction internally — the dispatcher must not wrap one.
+        if (command.Execution == ExecutionKind.SelfManagedTransaction)
+        {
+            try
+            {
+                var data = command.Execute(ctx);
+                var result = JsonResult.Success(data);
+                if (dryRun) result["dryRun"] = true;
+                return result;
+            }
+            catch (RevitCommandException ex)
+            {
+                return JsonResult.Error(ex.Code, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return JsonResult.Error("command_failed", ex.Message, ex.GetType().FullName);
+            }
+        }
+
         // Model-write commands always need a document + a transaction.
         var doc = ctx.RequireDoc();
         using var tx = new Transaction(doc, $"MCP: {commandName}");

@@ -27,9 +27,10 @@
     <!-- Where to drop the manifest + dll for the local Revit install -->
     <RevitAddinFolder>$(APPDATA)\Autodesk\Revit\Addins\$(RevitVersion)</RevitAddinFolder>
 
-    <!-- Revit 2027+ requires .NET 10; Revit 2025-2026 uses .NET 8 -->
-    <TargetFramework Condition="$([MSBuild]::VersionGreaterThanOrEquals($(RevitVersion), 2027))">net10.0-windows</TargetFramework>
-    <TargetFramework Condition="$([MSBuild]::VersionLessThan($(RevitVersion), 2027))">net8.0-windows</TargetFramework>
+    <!-- Revit 2025.5+ ships .NET 10-based RevitAPI/RevitAPIUI on this machine (file version 25.5.0.57);
+         original 2027-cutoff assumption is stale for this local install, so 2025+ now targets net10.0. -->
+    <TargetFramework Condition="$([MSBuild]::VersionGreaterThanOrEquals($(RevitVersion), 2025))">net10.0-windows</TargetFramework>
+    <TargetFramework Condition="$([MSBuild]::VersionLessThan($(RevitVersion), 2025))">net8.0-windows</TargetFramework>
   </PropertyGroup>
 
   <!-- On developer machines use the real Revit DLLs from the install folder.

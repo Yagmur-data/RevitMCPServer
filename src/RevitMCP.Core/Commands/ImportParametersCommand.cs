@@ -51,7 +51,7 @@ public sealed class ImportParametersCommand : IRevitCommand
                 var el = doc.GetElement(new ElementId(elementId))
                     ?? throw new InvalidOperationException($"Element {elementId} not found.");
 
-                var param = el.LookupParameter(paramName)
+                var param = ParamLookup.Writable(el, paramName)
                     ?? throw new InvalidOperationException(
                         $"Param '{paramName}' not found on element {elementId}.");
 

@@ -43,6 +43,12 @@ public sealed class TagAllInViewCommand : IRevitCommand
             ?? throw new RevitCommandException("not_found",
                 $"Category '{categoryName}' not found. Use list_categories to see valid names.");
 
+        // Rooms need RoomTag (doc.Create.NewRoomTag), not IndependentTag, and a
+        // view-scoped collector finds no rooms in a plan (rooms are not visible
+        // elements there), so they take their own path.
+        if (cat.Id.Value == (long)BuiltInCategory.OST_Rooms)
+            return TagRooms(doc, view, skipTagged);
+
         // Collect already-tagged element IDs in this view (to honour skipTagged)
         var alreadyTagged = new HashSet<long>();
         if (skipTagged)
@@ -90,6 +96,76 @@ public sealed class TagAllInViewCommand : IRevitCommand
                 {
                     ["tagId"] = tag.Id.Value,
                     ["elementId"] = element.Id.Value,
+                });
+            }
+            catch
+            {
+                failed++;
+            }
+        }
+
+        return new JsonObject
+        {
+            ["tagged"] = taggedArr.Count,
+            ["skipped"] = skipped,
+            ["failed"] = failed,
+            ["tags"] = taggedArr,
+        };
+    }
+
+    /// <summary>
+    /// Tag the placed rooms on the plan view's level with RoomTags at each
+    /// room's location point.
+    /// </summary>
+    private static JsonNode TagRooms(Document doc, View view, bool skipTagged)
+    {
+        if (view is not ViewPlan plan || plan.GenLevel is null)
+            throw new RevitCommandException("bad_request",
+                $"Room tags need a plan view with a level; view {view.Id.Value} is not one.");
+
+        var alreadyTagged = new HashSet<long>();
+        if (skipTagged)
+        {
+            foreach (var tag in new FilteredElementCollector(doc, view.Id)
+                         .OfCategory(BuiltInCategory.OST_RoomTags)
+                         .WhereElementIsNotElementType()
+                         .OfType<Autodesk.Revit.DB.Architecture.RoomTag>())
+            {
+                if (tag.TaggedLocalRoomId != ElementId.InvalidElementId)
+                    alreadyTagged.Add(tag.TaggedLocalRoomId.Value);
+            }
+        }
+
+        var taggedArr = new JsonArray();
+        int skipped = 0, failed = 0;
+
+        foreach (var room in new FilteredElementCollector(doc)
+                     .OfCategory(BuiltInCategory.OST_Rooms)
+                     .WhereElementIsNotElementType()
+                     .OfType<Autodesk.Revit.DB.Architecture.Room>()
+                     .Where(r => r.LevelId == plan.GenLevel.Id && r.Area > 0))
+        {
+            if (skipTagged && alreadyTagged.Contains(room.Id.Value))
+            {
+                skipped++;
+                continue;
+            }
+
+            try
+            {
+                if (room.Location is not LocationPoint lp)
+                {
+                    failed++;
+                    continue;
+                }
+
+                var tag = doc.Create.NewRoomTag(
+                    new LinkElementId(room.Id), new UV(lp.Point.X, lp.Point.Y), view.Id);
+
+                taggedArr.Add(new JsonObject
+                {
+                    ["tagId"] = tag.Id.Value,
+                    ["elementId"] = room.Id.Value,
                 });
             }
             catch

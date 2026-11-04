@@ -21,6 +21,18 @@ public enum ExecutionKind
     /// effect anyway.
     /// </summary>
     UiAction,
+
+    /// <summary>
+    /// Mutates the model, but the command opens and commits/rolls back its
+    /// OWN <see cref="Autodesk.Revit.DB.Transaction"/> instead of letting the
+    /// dispatcher wrap one — required for APIs built around an edit-scope
+    /// object (e.g. <see cref="Autodesk.Revit.DB.Architecture.StairsEditScope"/>)
+    /// that refuse to start while a transaction is already open ("the document
+    /// is currently modifiable"). The dispatcher does not open a transaction
+    /// for these and cannot participate in a batch — the command must honour
+    /// <see cref="CommandContext.DryRun"/> itself (commit vs. roll back).
+    /// </summary>
+    SelfManagedTransaction,
 }
 
 /// <summary>

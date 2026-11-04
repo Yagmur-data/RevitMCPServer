@@ -40,7 +40,7 @@ public sealed class SetParameterCommand : IRevitCommand
         var element = doc.GetElement(new ElementId(idValue))
             ?? throw new RevitCommandException("not_found", $"No element with id {idValue}.");
 
-        var param = element.LookupParameter(paramName)
+        var param = ParamLookup.Writable(element, paramName)
             ?? throw new RevitCommandException("not_found",
                 $"Element {idValue} has no parameter named '{paramName}'.");
 

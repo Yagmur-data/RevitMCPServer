@@ -100,7 +100,7 @@ public sealed class UpdateWhereCommand : IRevitCommand
 
         foreach (var (write, subject) in targets)
         {
-            var param = write.LookupParameter(setParamName);
+            var param = ParamLookup.Writable(write, setParamName);
             var row = new JsonObject { ["id"] = subject.Id.Value, ["name"] = subject.Name };
 
             if (param is null)

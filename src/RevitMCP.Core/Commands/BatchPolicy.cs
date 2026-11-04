@@ -15,12 +15,17 @@ public static class BatchPolicy
     /// </summary>
     public static JsonObject? ValidateBatchKinds(IEnumerable<ExecutionKind> kinds)
     {
-        bool anyWrite = false, anyUi = false;
+        bool anyWrite = false, anyUi = false, anySelfManaged = false;
         foreach (var k in kinds)
         {
             if (k == ExecutionKind.ModelWrite) anyWrite = true;
             if (k == ExecutionKind.UiAction)   anyUi   = true;
+            if (k == ExecutionKind.SelfManagedTransaction) anySelfManaged = true;
         }
+        if (anySelfManaged)
+            return JsonResult.Error("bad_request",
+                "This command manages its own transaction (e.g. create_stair) and " +
+                "cannot run inside a batch. Call it on its own.");
         if (anyWrite && anyUi)
             return JsonResult.Error("bad_request",
                 "Batch mixes ModelWrite and UiAction commands. " +

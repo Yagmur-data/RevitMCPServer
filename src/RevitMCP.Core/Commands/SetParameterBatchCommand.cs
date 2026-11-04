@@ -50,7 +50,7 @@ public sealed class SetParameterBatchCommand : IRevitCommand
                 var element = doc.GetElement(new ElementId(idValue))
                     ?? throw new RevitCommandException("not_found", $"Element {idValue} not found.");
 
-                var param = element.LookupParameter(paramName)
+                var param = ParamLookup.Writable(element, paramName)
                     ?? throw new RevitCommandException("not_found", $"Parameter '{paramName}' not found on element {idValue}.");
 
                 if (param.IsReadOnly)

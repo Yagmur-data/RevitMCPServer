@@ -81,7 +81,7 @@ public sealed class CopyParametersCommand : IRevitCommand
 
             foreach (var (paramName, srcParam) in sourceParams)
             {
-                var tgtParam = targetElem.LookupParameter(paramName);
+                var tgtParam = ParamLookup.Writable(targetElem, paramName);
                 if (tgtParam == null || tgtParam.IsReadOnly || tgtParam.StorageType != srcParam.StorageType)
                     continue;
 

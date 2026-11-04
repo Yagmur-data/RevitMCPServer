@@ -12,8 +12,8 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <RevitVersion Condition="'$(RevitVersion)' == ''">2026</RevitVersion>
     <RevitInstallDir Condition="'$(RevitInstallDir)' == ''">C:\Program Files\Autodesk\Revit $(RevitVersion)</RevitInstallDir>
-    <TargetFramework Condition="$([MSBuild]::VersionGreaterThanOrEquals($(RevitVersion), 2027))">net10.0-windows</TargetFramework>
-    <TargetFramework Condition="$([MSBuild]::VersionLessThan($(RevitVersion), 2027))">net8.0-windows</TargetFramework>
+    <TargetFramework Condition="$([MSBuild]::VersionGreaterThanOrEquals($(RevitVersion), 2025))">net10.0-windows</TargetFramework>
+    <TargetFramework Condition="$([MSBuild]::VersionLessThan($(RevitVersion), 2025))">net8.0-windows</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
