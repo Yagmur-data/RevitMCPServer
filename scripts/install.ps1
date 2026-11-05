@@ -221,7 +221,9 @@ $CLIENT_TARGETS = @{
 # Build the logical server entries (one per installed Revit version).
 $entries = [ordered]@{}
 foreach ($ver in $installed) {
-    $port = $PORT_BASE + ($ver - 2026)
+    # The add-in auto-assigns 7891 to every version below 2026 (App.ResolvePort),
+    # so 2025 must also get 7891 here, not 7890.
+    $port = if ($ver -ge 2026) { $PORT_BASE + ($ver - 2026) } else { $PORT_BASE }
     $indexArg = if ($serverIndex) { ($serverIndex -replace '\\', '/') } else { "<path-to>/dist/index.js" }
     $entries["revit-$ver"] = [ordered]@{
         command = "node"
